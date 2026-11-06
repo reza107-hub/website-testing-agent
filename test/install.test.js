@@ -126,3 +126,33 @@ test("install copies a runtime that the skill can run with node", () => {
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /plan \[feature\|all\]/);
 });
+
+test("init checks that the browser starts, and warns with the fix when it cannot", () => {
+  const host = freshHost();
+  const ok = init({ hostDir: host, packageRoot, run: okRun });
+  assert.ok(ok.some((l) => l === "Checked that the browser starts"));
+  assert.ok(!ok.some((l) => l.startsWith("Warning:")));
+
+  const calls = [];
+  const noLibs = (cmd, args) => {
+    calls.push(args.join(" "));
+    return { status: args.includes("open") ? 1 : 0 };
+  };
+  const lines = init({ hostDir: freshHost(), packageRoot, run: noLibs });
+  const warning = lines.find((l) => l.startsWith("Warning:"));
+  assert.match(warning, /install-browser chromium --with-deps/);
+  assert.ok(calls.some((c) => c.includes("close")), "the check session is closed even when it fails");
+});
+
+test("the browser launch check cleans up its temp config", () => {
+  let configPath;
+  checkBrowserLaunchesFor((cmd, args) => {
+    const c = args.find((a) => a.startsWith("--config="));
+    if (c) configPath = c.slice(9);
+    return { status: 0 };
+  });
+  assert.equal(existsSync(configPath), false);
+});
+
+import { checkBrowserLaunches } from "../scripts/install.js";
+const checkBrowserLaunchesFor = (run) => checkBrowserLaunches("/x", run);

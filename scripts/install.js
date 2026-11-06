@@ -9,7 +9,10 @@ import {
   writeFileSync,
 } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync as writeTmp } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { CHROMIUM_CONFIG } from "./browser.js";
 
 export const MIN_NODE_MAJOR = 18;
 
@@ -99,6 +102,26 @@ export function installBrowserTooling(hostDir, run = defaultRun) {
   }
 }
 
+// Opens and closes the bundled Chromium once. Returns null when it works, or a
+// message saying how to fix it. On a bare Linux machine the browser downloads
+// but cannot start until its system libraries are installed.
+export function checkBrowserLaunches(hostDir, run = defaultRun) {
+  const dir = mkdtempSync(join(tmpdir(), "site-tester-launch-"));
+  const config = join(dir, "config.json");
+  const session = "-s=site-tester-launch-check";
+  try {
+    writeTmp(config, JSON.stringify(CHROMIUM_CONFIG));
+    const opened = run("playwright-cli", [session, "open", "about:blank", `--config=${config}`], hostDir);
+    if (opened.error || opened.status !== 0) {
+      return "The Chromium browser was downloaded but could not start. On Linux it usually needs system libraries. Run: playwright-cli install-browser chromium --with-deps (this may ask for sudo), then run init again.";
+    }
+    return null;
+  } finally {
+    run("playwright-cli", [session, "close"], hostDir);
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 // Returns a list of human-readable lines saying what was done.
 export function init({
   hostDir,
@@ -143,6 +166,8 @@ export function init({
   } else {
     installBrowserTooling(hostDir, run);
     done.push("Installed playwright-cli, its skills, and Chromium");
+    const problem = checkBrowserLaunches(hostDir, run);
+    done.push(problem ? `Warning: ${problem}` : "Checked that the browser starts");
   }
   return done;
 }

@@ -51,7 +51,12 @@ async function main() {
   if (command === "--version" || command === "-v") return out(pkg.version);
 
   if (command === "init") {
-    for (const line of init({ hostDir: host, packageRoot, skipBrowser: args.includes("--skip-browser") })) out(`- ${line}`);
+    const lines = init({ hostDir: host, packageRoot, skipBrowser: args.includes("--skip-browser") });
+    for (const line of lines) out(`- ${line}`);
+    if (lines.some((l) => l.startsWith("Warning:"))) {
+      process.exitCode = 1;
+      return out("\nSetup is not finished. Fix the warning above, then run init again.");
+    }
     return out("\nNext: edit .testing-agent/instructions.md, then ask Claude Code: /test all");
   }
 
