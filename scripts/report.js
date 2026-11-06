@@ -159,7 +159,9 @@ export function writeReport(hostDir, run, now = new Date()) {
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, "report.html"), buildReportHtml(full, hostDir, c));
   const result = {
-    status: c.issues > 0 ? "fail" : "pass",
+    // A run is only a pass when nothing was wrong and every feature ran.
+    // Skipped steps (for example a payment on a live key) do not fail a run.
+    status: c.issues > 0 || c.notRun > 0 ? "fail" : "pass",
     counts: c,
     finishedAt: full.finishedAt,
     durationSeconds: full.durationSeconds,

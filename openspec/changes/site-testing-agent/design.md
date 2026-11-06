@@ -49,7 +49,7 @@ During a feature, screenshots are written to a temporary folder. When a check fa
 Alternative: link to image files beside the report. Rejected: breaks when the file is moved, and it conflicts with the delete-screenshots rule.
 
 **7. Result file and check command for CI.**
-Each run writes `result.json` (overall status and counts) beside the report. A `check` command in the installed package reads it and exits non-zero on failure. Actually running tests in CI needs headless Claude Code and is not designed here.
+Each run writes `result.json` (overall status and counts) beside the report. A `check` command in the installed package reads it and exits non-zero on failure. A run fails when it has any issue or any feature that was not run, so an unreachable site cannot pass CI by accident. Skipped steps (a payment on a live key) do not fail a run. Actually running tests in CI needs headless Claude Code and is not designed here.
 
 **8. Stripe sandbox guard by key prefix.**
 Before a payment step, the agent reads the target's publishable key from the page or network and runs the step only if it starts with the test-mode prefix. Unknown means skip.
@@ -75,6 +75,6 @@ New project with no existing users. Pilot on TuberStudio (`front/tuber-live`): r
 
 ## Open Questions
 
-- Whether the `check` command should also fail when features were not run (for example an unreachable site). Today it fails only when there are issues, and not-run items appear in the counts.
+None.
 
-Resolved during implementation: the default session limit is 3, and each run keeps its own dated report folder, so history is kept.
+Resolved during implementation: the default session limit is 3, each run keeps its own dated report folder so history is kept, and `check` fails on not-run features.

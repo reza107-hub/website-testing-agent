@@ -283,3 +283,28 @@ test("add-skip, add-result and mark-failed record nothing when arguments are mis
   assert.equal(ok.code, 0);
   assert.equal(loadState(host).skipped.length, 1);
 });
+
+test("a run with no issues but a feature not run is a fail, and check exits 1", async () => {
+  const host = hostWithScreens();
+  const { result } = writeReport(host, baseRun({
+    results: [{ feature: "a", account: "b", status: "pass" }],
+    notRun: [{ name: "profile (tech)", reason: "target did not respond" }],
+  }));
+  assert.equal(result.status, "fail");
+  assert.equal(result.counts.issues, 0);
+  assert.equal(result.counts.notRun, 1);
+  const r = await runCli(host, "check");
+  assert.equal(r.code, 1);
+  assert.match(r.stdout, /fail: 0 issue\(s\), 1 passed, 1 not run/);
+});
+
+test("skipped steps alone do not fail a run, and check exits 0", async () => {
+  const host = hostWithScreens();
+  const { result } = writeReport(host, baseRun({
+    results: [{ feature: "a", account: "b", status: "pass" }],
+    skipped: [{ name: "pay (b)", reason: "live Stripe key" }],
+  }));
+  assert.equal(result.status, "pass");
+  assert.equal(result.counts.skipped, 1);
+  assert.equal((await runCli(host, "check")).code, 0);
+});

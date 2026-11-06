@@ -56,15 +56,20 @@ The system SHALL NOT create issues, tickets, or comments in any external service
 - **THEN** the findings appear only in the local report and result file
 
 ### Requirement: Machine-readable result
-Each run SHALL write a result file beside the report stating overall pass or fail and the counts, and the installed check command SHALL exit with a non-zero code when the result is fail.
+Each run SHALL write a result file beside the report stating overall pass or fail and the counts, and the installed check command SHALL exit with a non-zero code when the result is fail. A run is a pass only when it has no issues and every selected feature ran. Skipped steps do not make a run fail.
 
 #### Scenario: Failure result
 - **WHEN** a run has at least one issue
 - **THEN** the result file states fail
 - **AND** the check command exits with a non-zero code
 
+#### Scenario: Feature not run
+- **WHEN** a run has no issues but at least one selected feature was not run, for example because its site did not respond
+- **THEN** the result file states fail and counts the feature as not run
+- **AND** the check command exits with a non-zero code
+
 #### Scenario: Pass result
-- **WHEN** a run has no issues
+- **WHEN** a run has no issues and every selected feature ran, even if some steps were skipped
 - **THEN** the result file states pass
 - **AND** the check command exits with code zero
 

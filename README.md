@@ -85,7 +85,7 @@ The agent does only what this file says. It does not invent steps.
 node .testing-agent/runtime/bin/cli.js check
 ```
 
-It prints the result of the latest run. It exits with 1 when the run had issues, 0 when it had none, and 2 when no report exists. A feature that could not run (for example, an unreachable site) is counted as "not run", not as an issue, so check the counts as well.
+It prints the result of the latest run. It exits with 1 when the run had any issue or any feature that could not run (for example, an unreachable site), 0 when everything ran with no issues, and 2 when no report exists. Skipped steps, such as a payment on a live Stripe key, do not fail a run.
 
 ## Develop
 
