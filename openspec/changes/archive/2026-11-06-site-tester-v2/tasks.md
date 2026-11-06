@@ -48,7 +48,7 @@
 
 ## 8. Release and pilot
 
-- [ ] 8.1 Run the full test suite, validate the change, push, and repeat the clean-container install check, and verify local and remote commits match and the install passes
+- [x] 8.1 Run the full test suite, validate the change, push, and repeat the clean-container install check, and verify local and remote commits match and the install passes
 - [x] 8.2 (needs the owner's agreement) Remove the feature-level `target:` and `accounts:` lines from the pilot `instructions.md` and add a free account with a plan label, and verify `lint` reports no problems (marked done by the owner; not verified by the agent)
 - [x] 8.3 (needs the owner's agreement) Run `/test stepgen on beta using the recipe account and the free account` in the pilot project, and verify the report header shows the words, target and accounts, and `tasks.md` lists the issues (marked done by the owner; not verified by the agent)
-- [ ] 8.4 Archive this change after `site-testing-agent` is archived, and verify the main specs contain the new and modified capabilities
+- [x] 8.4 Archive this change after `site-testing-agent` is archived, and verify the main specs contain the new and modified capabilities

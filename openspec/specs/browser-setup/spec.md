@@ -35,7 +35,7 @@ The system SHALL support selecting Google Chrome or Microsoft Edge as installed 
 - **THEN** the agent stops before testing and states which browser or port is unavailable
 
 ### Requirement: Optional desktop control
-The system SHALL treat desktop control as off by default and SHALL use it only when the instructions file turns it on.
+The system SHALL treat desktop control as off by default and SHALL use it only when the instructions file turns it on. In this version, turning it on SHALL only make the agent run the permission check and the window-visibility check. The agent SHALL NOT use a desktop-control tool to operate windows or dialogs.
 
 #### Scenario: Off by default
 - **WHEN** the instructions file does not turn desktop control on
@@ -43,7 +43,8 @@ The system SHALL treat desktop control as off by default and SHALL use it only w
 
 #### Scenario: Turned on
 - **WHEN** the instructions file turns desktop control on
-- **THEN** the agent may use desktop control for windows or dialogs outside the page content
+- **THEN** the agent runs the permission check and the window-visibility check before testing
+- **AND** the agent does not use desktop control to operate any window or dialog
 
 ### Requirement: Desktop control permission check
 When desktop control is on, the agent SHALL confirm before testing that the operating system's accessibility permission is granted for the browser, and SHALL stop with guidance if it is not.
