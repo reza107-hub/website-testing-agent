@@ -78,6 +78,92 @@ ${img}
 </article>`;
 }
 
+const SEVERITY_RANK = { critical: 0, high: 1, medium: 2, low: 3 };
+
+// The run request as an object, even for runs written by older versions.
+function requestOf(run) {
+  const r = run.request;
+  if (r && typeof r === "object") {
+    return { feature: r.feature ?? "", words: r.words ?? "", target: r.target ?? "", accounts: r.accounts ?? [], extras: r.extras ?? [] };
+  }
+  return { feature: r ?? "", words: "", target: "", accounts: [], extras: [] };
+}
+
+// One task per issue (critical first), then one per feature that was not run.
+export function buildTasks(run) {
+  const issues = (run.issues ?? [])
+    .map((issue, i) => ({ issue, i }))
+    .sort((x, y) => (SEVERITY_RANK[x.issue.severity] ?? 9) - (SEVERITY_RANK[y.issue.severity] ?? 9) || x.i - y.i)
+    .map(({ issue }) => ({
+      kind: "issue",
+      severity: issue.severity,
+      title: issue.title,
+      where: `${issue.feature} on ${issue.target} as ${issue.account}`,
+      steps: issue.steps,
+      expected: issue.expected,
+      actual: issue.actual,
+      fix: issue.fixSuggestion,
+    }));
+  const notRun = (run.notRun ?? []).map((n) => ({
+    kind: "notrun",
+    severity: "not run",
+    title: `Find out why this did not run: ${n.name}`,
+    where: n.name,
+    steps: [],
+    expected: "",
+    actual: n.reason,
+    fix: "Fix the cause, then run the test again.",
+  }));
+  return [...issues, ...notRun];
+}
+
+// Plain text only: no code fences and no inline code marks.
+const plain = (v) => String(v ?? "").replace(/```[\s\S]*?```/g, " ").replace(/`/g, "").replace(/\s+/g, " ").trim();
+
+export function buildTasksMd(run, reportFile = "report.html") {
+  const tasks = buildTasks(run);
+  const lines = ["# Tasks from the test run", "", `Report: ${reportFile}`, ""];
+  if (tasks.length === 0) {
+    lines.push("There are no tasks. The run found no issues and every feature ran.");
+    return `${lines.join("\n")}\n`;
+  }
+  for (const t of tasks) {
+    lines.push(`- [ ] [${t.severity}] ${plain(t.title)} (${plain(t.where)})`);
+    if (t.steps.length) lines.push(`  - Steps: ${t.steps.map((s, i) => `${i + 1}. ${plain(s)}`).join(" ")}`);
+    if (t.expected) lines.push(`  - Expected: ${plain(t.expected)}`);
+    if (t.actual) lines.push(`  - ${t.kind === "issue" ? "Actual" : "Reason"}: ${plain(t.actual)}`);
+    lines.push(`  - Suggested fix: ${plain(t.fix)}`);
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+function tasksHtml(run) {
+  const tasks = buildTasks(run);
+  if (tasks.length === 0) return "<p class=ok>There are no tasks.</p>";
+  return `<ol class=tasks>${tasks
+    .map(
+      (t) =>
+        `<li><label><input type="checkbox"> <span class=badge>${esc(t.severity)}</span> <b>${esc(t.title)}</b></label><br><span class=muted>${esc(t.where)}</span><br>${esc(t.kind === "issue" ? t.fix : `${t.actual}. ${t.fix}`)}</li>`,
+    )
+    .join("")}</ol>`;
+}
+
+function requestHtml(run) {
+  const r = requestOf(run);
+  const features = (run.features ?? []).map((f) => f.name);
+  const rows = [
+    ["Request", r.words ? `${r.feature} ${r.words}` : r.feature],
+    ["Target", r.target],
+    ["Accounts", r.accounts.join(", ")],
+    ["Features run", features.join(", ")],
+  ].filter(([, v]) => v);
+  const extras = r.extras.length ? `<p class=muted>Run-only checks: ${esc(r.extras.join("; "))}</p>` : "";
+  const repairs = (run.repairs ?? []).length
+    ? `<p class=muted>Repairs made to instructions.md: ${esc(run.repairs.map((x) => `${x.what} (${x.old} to ${x.new})`).join("; "))}</p>`
+    : "";
+  return `<table class=req>${rows.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join("")}</table>${extras}${repairs}`;
+}
+
 export function buildReportHtml(run, hostDir, c = counts(run)) {
   const groups = new Map();
   for (const i of run.issues ?? []) {
@@ -96,8 +182,6 @@ export function buildReportHtml(run, hostDir, c = counts(run)) {
     .map((r) => `<tr><td>${esc(r.feature)}</td><td>${esc(r.account)}</td><td class="st-${esc(r.status)}">${esc(r.status)}</td></tr>`)
     .join("");
   const reasons = (items) => list((items ?? []).map((n) => `${n.name}: ${n.reason}`));
-  const targets = [...new Set((run.sessions ?? []).flatMap((s) => s.features.map((f) => f.target)))];
-  const accounts = (run.sessions ?? []).map((s) => s.account);
 
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
@@ -116,15 +200,19 @@ h1{margin:0 0 4px}.muted{color:#667}.ok{color:#116329;font-weight:600}
 img{max-width:100%;border:1px solid #d0d7de;border-radius:6px;margin-top:8px}
 pre{background:#f6f8fa;padding:10px;overflow:auto;border-radius:6px}
 table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #d0d7de;padding:6px 8px;text-align:left}
+.req th{width:130px;color:#667;font-weight:600}
+.tasks{padding-left:20px}.tasks li{margin:10px 0}
 .st-pass{color:#116329}.st-fail{color:#cf222e}.st-skipped{color:#bf8700}
 </style></head><body>
 <h1>Site test report</h1>
-<p class=muted>${esc(run.startedAt)} to ${esc(run.finishedAt)} (${esc(run.durationSeconds)} s) | request: ${esc(run.request)}</p>
-<p class=muted>Targets: ${esc(targets.join(", ") || "none")} | Accounts: ${esc(accounts.join(", ") || "none")}</p>
+<p class=muted>${esc(run.startedAt)} to ${esc(run.finishedAt)} (${esc(run.durationSeconds)} s)</p>
+${requestHtml(run)}
 <div class="summary">
 <div class=card><b>${c.passed}</b>passed</div><div class=card><b>${c.failed}</b>failed</div>
 <div class=card><b>${c.skipped}</b>skipped</div><div class=card><b>${c.notRun}</b>not run</div>
 <div class=card><b>${c.issues}</b>issues</div></div>
+<h2>Tasks</h2>
+${tasksHtml(run)}
 <h2>Issues</h2>
 ${issuesHtml}
 <h2>Results</h2>
@@ -158,6 +246,7 @@ export function writeReport(hostDir, run, now = new Date()) {
   const dir = join(hostDir, ".testing-agent", "reports", stamp(finished));
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, "report.html"), buildReportHtml(full, hostDir, c));
+  writeFileSync(join(dir, "tasks.md"), buildTasksMd(full));
   const result = {
     // A run is only a pass when nothing was wrong and every feature ran.
     // Skipped steps (for example a payment on a live key) do not fail a run.
@@ -166,6 +255,8 @@ export function writeReport(hostDir, run, now = new Date()) {
     finishedAt: full.finishedAt,
     durationSeconds: full.durationSeconds,
     report: "report.html",
+    tasks: "tasks.md",
+    ...(full.aborted ? { reason: full.notRun?.[0]?.reason } : {}),
   };
   writeFileSync(join(dir, "result.json"), JSON.stringify(result, null, 2));
 

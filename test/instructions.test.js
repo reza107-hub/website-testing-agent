@@ -1,12 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { parseInstructions, selectRun } from "../scripts/instructions.js";
-
-const templatePath = fileURLToPath(
-  new URL("../templates/instructions.md", import.meta.url),
-);
+import { declaredNames, findName, parseInstructions, selectFeatures } from "../scripts/instructions.js";
 
 const sample = `
 ## Targets
@@ -14,11 +8,10 @@ const sample = `
 - live: https://example.com
 
 ## Accounts
-- recipe: email=a@example.com | password=pw1 | channel=https://youtube.com/@a
-- tech: email=b@example.com | password=pw2
+- recipe: email=a@example.com | password=pw1 | niche=recipe | plan=pro
+- free: email=b@example.com | password=pw2 | plan=free
 
 ## Feature: search
-target: local
 steps:
 1. Open /search
 2. Type a word
@@ -26,167 +19,153 @@ expect:
 - Results show
 
 ## Feature: profile
-target: live
-accounts: tech
 steps:
 - Open /profile
 expect:
 - Name shows
+checks:
+- no console errors
 `;
 
-// 2.1 template
-test("template parses with no errors and has the credential warning first", () => {
-  const text = readFileSync(templatePath, "utf8");
-  const parsed = parseInstructions(text);
-  assert.deepEqual(parsed.errors, []);
-  assert.equal(parsed.features.length, 1);
-  assert.equal(parsed.features[0].name, "login");
-  assert.equal(parsed.features[0].notRun, undefined);
-  const firstLines = text.split("\n").slice(0, 6).join("\n");
-  assert.match(firstLines, /WARNING/);
-  assert.match(firstLines, /private repository/);
-});
+const codes = (p) => p.problems.map((x) => x.code);
 
-// 2.2 parser
 test("defaults apply when the setup section is missing", () => {
   const { setup } = parseInstructions(sample);
   assert.equal(setup.browser, "chromium");
   assert.equal(setup.browser_mode, "launch");
   assert.equal(setup.desktop_control, false);
+  assert.equal(setup.max_parallel, 3);
 });
 
-test("defaults apply when setup omits browser", () => {
-  const { setup, errors } = parseInstructions("## Setup\n\ndesktop_control: on\n");
-  assert.equal(setup.browser, "chromium");
-  assert.equal(setup.desktop_control, true);
-  assert.deepEqual(errors, []);
+test("setup values are read, and bad ones are recorded as problems, not thrown", () => {
+  const ok = parseInstructions("## Setup\n\ndesktop_control: on\nmax_parallel: 5\n");
+  assert.equal(ok.setup.desktop_control, true);
+  assert.equal(ok.setup.max_parallel, 5);
+  assert.deepEqual(ok.problems, []);
+
+  const bad = parseInstructions("## Setup\nbrowser: netscape\ndebug_port: abc\ndesktop_control: maybe\nmax_parallel: 0\n");
+  assert.deepEqual(bad.problems.map((p) => p.key), ["browser", "debug_port", "desktop_control", "max_parallel"]);
+  assert.ok(bad.problems.every((p) => p.code === "setup_value"));
+  assert.equal(bad.setup.browser, "chromium");
+  assert.equal(bad.setup.max_parallel, 3);
 });
 
-test("parses targets, accounts, and features", () => {
+test("targets, accounts and features are read; a feature holds only instructions", () => {
   const p = parseInstructions(sample);
   assert.deepEqual(p.targets, { local: "http://localhost:3000", live: "https://example.com" });
-  assert.equal(p.accounts.recipe.email, "a@example.com");
-  assert.equal(p.accounts.recipe.channel, "https://youtube.com/@a");
+  assert.deepEqual(p.features.map((f) => f.name), ["search", "profile"]);
   assert.deepEqual(p.features[0].steps, ["Open /search", "Type a word"]);
-  assert.deepEqual(p.features[1].accounts, ["tech"]);
-  assert.deepEqual(p.errors, []);
+  assert.deepEqual(p.features[1].checks, ["no console errors"]);
+  assert.equal(p.features[0].target, undefined);
+  assert.equal(p.features[0].accounts, undefined);
+  assert.deepEqual(p.problems, []);
 });
 
-test("invalid setup values and missing feature fields are reported", () => {
-  const p = parseInstructions(`## Setup
-browser: netscape
-debug_port: abc
-desktop_control: maybe
-
-## Feature: empty
-target: local
-`);
-  assert.ok(p.errors.some((e) => /unknown browser "netscape"/.test(e)));
-  assert.ok(p.errors.some((e) => /invalid debug_port/.test(e)));
-  assert.ok(p.errors.some((e) => /desktop_control must be on or off/.test(e)));
-  assert.ok(p.errors.some((e) => /"empty": has no steps/.test(e)));
-  assert.ok(p.errors.some((e) => /"empty": has no expect/.test(e)));
-  assert.equal(p.setup.browser, "chromium");
+// 1.3
+test("account labels are every field except email and password", () => {
+  const p = parseInstructions(sample);
+  assert.deepEqual(p.accounts.recipe.labels, { niche: "recipe", plan: "pro" });
+  assert.deepEqual(p.accounts.free.labels, { plan: "free" });
+  assert.equal(p.accounts.free.email, "b@example.com");
+  assert.equal(p.accounts.free.password, "pw2");
+  assert.ok(!("email" in p.accounts.free.labels) && !("password" in p.accounts.free.labels));
 });
 
-// 2.3 validation
-test("unknown target marks only that feature as not run, with a reason", () => {
+// 1.2
+test("target and accounts lines inside a feature are ignored and recorded", () => {
   const p = parseInstructions(`${sample}
-## Feature: broken
-target: nowhere
-steps:
-- x
-expect:
-- y
-`);
-  const broken = p.features.find((f) => f.name === "broken");
-  assert.match(broken.notRun, /unknown target "nowhere"/);
-  assert.equal(p.features.find((f) => f.name === "search").notRun, undefined);
-});
-
-test("unknown account marks that feature as not run, with a reason", () => {
-  const p = parseInstructions(`${sample}
-## Feature: ghost
+## Feature: old
 target: local
-accounts: recipe, nobody
+accounts: recipe
 steps:
-- x
+- Open /old
 expect:
-- y
+- Loads
 `);
-  const ghost = p.features.find((f) => f.name === "ghost");
-  assert.match(ghost.notRun, /unknown account "nobody"/);
+  const f = p.features.find((x) => x.name === "old");
+  assert.equal(f.target, undefined);
+  assert.deepEqual(f.ignored, ["target: local", "accounts: recipe"]);
+  assert.deepEqual(f.steps, ["Open /old"]);
+  assert.deepEqual(p.problems.filter((x) => x.code === "ignored_line").map((x) => x.line), ["target: local", "accounts: recipe"]);
+  assert.equal(codes(p).includes("feature_no_steps"), false);
 });
 
-test("a single declared target is used when a feature names none", () => {
+test("a v1-style file still parses and keeps every step", () => {
   const p = parseInstructions(`## Targets
-- only: http://x.test
+- local: http://localhost:3000
 
-## Feature: f
+## Accounts
+- main: email=a@x.test | password=1
+
+## Feature: login
+target: local
+accounts: main
 steps:
-- a
+- Open /login
 expect:
-- b
+- Dashboard opens
 `);
-  assert.equal(p.features[0].target, "only");
-  assert.equal(p.features[0].notRun, undefined);
+  assert.equal(p.features.length, 1);
+  assert.deepEqual(p.features[0].steps, ["Open /login"]);
+  assert.deepEqual(codes(p), ["ignored_line", "ignored_line"]);
 });
 
-test("no target set with several targets declared marks the feature not run", () => {
+test("missing steps and expected results, unreadable lines and duplicates are recorded", () => {
   const p = parseInstructions(`## Targets
 - a: http://a.test
-- b: http://b.test
+- a: http://b.test
+- this is not a target
 
-## Feature: f
+## Accounts
+- One account per niche. Use them here.
+- x: email=a@x.test | password=1
+- x: email=b@x.test | password=2
+
+## Feature: empty
+
+## Feature: Empty
 steps:
-- a
+- s
 expect:
-- b
+- e
 `);
-  assert.match(p.features[0].notRun, /no target set/);
+  assert.deepEqual(p.targets, { a: "http://a.test" });
+  assert.deepEqual(Object.keys(p.accounts), ["x"]);
+  const c = codes(p);
+  assert.equal(c.filter((x) => x === "unreadable_line").length, 2);
+  assert.equal(c.filter((x) => x === "duplicate").length, 3);
+  assert.ok(c.includes("feature_no_steps") && c.includes("feature_no_expect"));
 });
 
-// 2.4 selection
+// selection
 test("selecting a feature by name runs only that feature, case-insensitive", () => {
-  const sel = selectRun(parseInstructions(sample), "SEARCH");
-  assert.equal(sel.runs.length, 1);
-  assert.equal(sel.runs[0].feature.name, "search");
-});
-
-test("accounts default to every declared account", () => {
-  const sel = selectRun(parseInstructions(sample), "search");
-  assert.deepEqual(sel.runs[0].accounts, ["recipe", "tech"]);
-});
-
-test("a feature with listed accounts runs only those", () => {
-  const sel = selectRun(parseInstructions(sample), "profile");
-  assert.deepEqual(sel.runs[0].accounts, ["tech"]);
+  const sel = selectFeatures(parseInstructions(sample), "SEARCH");
+  assert.deepEqual(sel.features.map((f) => f.name), ["search"]);
 });
 
 test("all selects every feature", () => {
-  const sel = selectRun(parseInstructions(sample), "all");
-  assert.deepEqual(sel.runs.map((r) => r.feature.name), ["search", "profile"]);
-  assert.deepEqual(sel.notRun, []);
+  assert.deepEqual(selectFeatures(parseInstructions(sample), "all").features.map((f) => f.name), ["search", "profile"]);
 });
 
 test("an unmatched name returns the declared feature names and runs nothing", () => {
-  const sel = selectRun(parseInstructions(sample), "checkout");
+  const sel = selectFeatures(parseInstructions(sample), "checkout");
   assert.ok(sel.error);
   assert.deepEqual(sel.declared, ["search", "profile"]);
-  assert.equal(sel.runs, undefined);
+  assert.equal(sel.features, undefined);
 });
 
-test("not-run features are reported by the selector, not run", () => {
-  const p = parseInstructions(`${sample}
-## Feature: broken
-target: nowhere
-steps:
-- x
-expect:
-- y
-`);
-  const sel = selectRun(p, "all");
-  assert.equal(sel.runs.length, 2);
-  assert.equal(sel.notRun.length, 1);
-  assert.equal(sel.notRun[0].name, "broken");
+test("declared names carry account labels for messages that ask the user", () => {
+  const d = declaredNames(parseInstructions(sample));
+  assert.deepEqual(d.features, ["search", "profile"]);
+  assert.deepEqual(d.targets.map((t) => t.name), ["local", "live"]);
+  assert.deepEqual(d.accounts, [
+    { name: "recipe", labels: { niche: "recipe", plan: "pro" } },
+    { name: "free", labels: { plan: "free" } },
+  ]);
+});
+
+test("findName returns the declared spelling for a case-insensitive match", () => {
+  assert.equal(findName(["Beta", "local"], "beta"), "Beta");
+  assert.equal(findName(["Beta"], " BETA "), "Beta");
+  assert.equal(findName(["Beta"], "prod"), null);
 });
