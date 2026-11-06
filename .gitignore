@@ -1,0 +1,6 @@
+node_modules/
+.playwright-cli/
+.testing-agent/reports/
+.testing-agent/tmp/
+.claude/settings.local.json
+.claude/.headroom_*

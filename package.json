@@ -1,0 +1,23 @@
+{
+  "name": "site-tester",
+  "version": "0.1.0",
+  "description": "Drop-in website testing agent for Claude Code, driven by playwright-cli.",
+  "type": "module",
+  "bin": {
+    "site-tester": "bin/cli.js"
+  },
+  "files": [
+    "bin",
+    "scripts",
+    "templates",
+    "skill",
+    "command"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "license": "Apache-2.0"
+}
