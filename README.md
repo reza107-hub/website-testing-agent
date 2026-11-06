@@ -7,16 +7,18 @@ A website testing agent for Claude Code. You write what to check in one file. Th
 Run this in the root of the project you want to test. You need Node.js 18 or newer.
 
 ```
-npx github:<your-org>/<this-repo> init
+npx github:reza107-hub/website-testing-agent init
 ```
 
-Replace `<your-org>/<this-repo>` with the GitHub path of this repository. It will:
+It will:
 
 - create `.testing-agent/instructions.md` (it never overwrites an existing one)
 - add the Claude Code skill (`.claude/skills/site-tester`) and the `/test` command
 - copy the small run tools into `.testing-agent/runtime` (commit this folder so teammates get it)
 - add a short pointer to `CLAUDE.md` and ignore the report and temp folders in `.gitignore`
 - install `playwright-cli`, its skills, and a Chromium browser
+
+On a bare Linux machine (a fresh server or container), Chromium downloads but cannot start until its system libraries are installed. `init` checks this. If it warns, run `playwright-cli install-browser chromium --with-deps` (it may ask for sudo), then run `init` again.
 
 Run the same command again to update the skill, command and run tools. Your `instructions.md` stays as it is.
 

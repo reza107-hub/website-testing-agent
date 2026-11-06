@@ -17,7 +17,7 @@
 - [x] 3.3 Implement the idempotent re-run (never overwrite an existing `instructions.md`, update skill and command), and verify a second run leaves a user-edited file unchanged
 - [x] 3.4 Implement the `CLAUDE.md` pointer and the ignore-file entry for reports, and verify neither is duplicated on re-run
 - [x] 3.5 Implement installing `@playwright/cli`, its skills, and Chromium, and verify a Chromium browser is available afterwards
-- [ ] 3.6 Verify `npx github:<org>/<repo> init` works from a clean machine or container using the real GitHub repo
+- [x] 3.6 Verify `npx github:<org>/<repo> init` works from a clean machine or container using the real GitHub repo
 
 ## 4. Browser setup (`browser-setup`)
 
