@@ -44,6 +44,20 @@ When running all, the agent SHALL run the account sessions in parallel and SHALL
 - **WHEN** a run is started with all
 - **THEN** browsers run without visible windows unless the user asks for visible windows
 
+#### Scenario: Session limit
+- **WHEN** a run has more accounts than the session limit
+- **THEN** no more sessions than the limit run at the same time
+- **AND** each remaining account starts as soon as a running one finishes, and every account completes
+
+#### Scenario: Attached browser
+- **WHEN** the run uses an attached browser, which is one shared browser
+- **THEN** accounts run one at a time
+- **AND** the stored sign-in state is cleared before each account signs in
+
+#### Scenario: Visible single-feature run with several accounts
+- **WHEN** a single feature runs in a visible browser and applies to several accounts
+- **THEN** the accounts run one at a time so the user can watch each
+
 ### Requirement: Preflight checks
 Before running any step, the agent SHALL confirm that the instructions file is readable, the chosen browser is available, each needed target responds, and each needed account can sign in. If a check fails, the agent SHALL stop that part of the run and say what to fix.
 

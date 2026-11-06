@@ -18,6 +18,10 @@ The report SHALL show the target and account list, the counts of passed, failed,
 - **WHEN** every check passes
 - **THEN** the report is still produced and states that no issues were found
 
+#### Scenario: Skip recorded twice
+- **WHEN** the same step for the same account is recorded as skipped more than once
+- **THEN** the report counts it as one skipped item
+
 ### Requirement: Issue content
 Each issue SHALL include a title, a severity, the feature, target, and account, reproduction steps, the expected result, the actual result, and any relevant console or network errors.
 

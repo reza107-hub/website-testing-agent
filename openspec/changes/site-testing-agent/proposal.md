@@ -6,7 +6,7 @@ Website QA today is manual. A developer opens a browser, clicks through features
 
 - Add a Claude Code testing agent (a skill plus a `/test` command) that drives a real browser through `playwright-cli` and reports problems.
 - Add a user-editable `instructions.md` that declares browser, targets (sites), accounts, and per-feature steps and expectations. The agent acts only on what this file says.
-- Support two run modes: a single named feature, or `all` (every feature on every applicable account, run in parallel with one browser session per account).
+- Support two run modes: a single named feature, or `all` (every feature on every applicable account, run in parallel with one browser session per account, up to a set limit that defaults to 3).
 - Produce one self-contained HTML report per run. Each issue has a title, severity, reproduction steps, expected versus actual result, console and network evidence where relevant, a short text-only fix suggestion (no code), and an embedded screenshot.
 - Take screenshots while testing, keep only those tied to an issue, embed them in the report, and delete every other image so a clean run leaves no loose files.
 - Add a one-command installer that runs from a GitHub repo (`npx github:<org>/<repo> init`). It creates the instructions file, installs the skill and command into `.claude/`, installs `playwright-cli` skills and its own Chromium, and adds a short pointer in the project's `CLAUDE.md`.

@@ -23,6 +23,18 @@ The system SHALL install the browser automation skills and a Chromium browser as
 - **WHEN** the install completes
 - **THEN** a Chromium browser is available to the agent without further user action
 
+#### Scenario: Browser cannot start
+- **WHEN** the browser downloads but cannot start, for example because a Linux machine lacks system libraries
+- **THEN** the install reports that setup is not finished and states the command that fixes it
+- **AND** the install exits with a failure code, and running it again after the fix succeeds
+
+### Requirement: Run tools available without a global install
+The system SHALL place the run tools inside the host project, so the agent can run them without any command installed on the machine's path.
+
+#### Scenario: Tools run from the project
+- **WHEN** the install completes
+- **THEN** the run tools can be started from the project folder alone
+
 ### Requirement: Safe re-run
 The system SHALL NOT overwrite a user-edited instructions file when the install command is run again.
 

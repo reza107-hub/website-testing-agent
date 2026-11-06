@@ -13,11 +13,19 @@ The agent SHALL take its test scope, steps, and expectations only from the instr
 - **AND** the agent lists the declared feature names
 
 ### Requirement: Setup section
-The instructions file SHALL support a setup section declaring the browser choice, the browser mode, the optional desktop-control switch, and any debug port.
+The instructions file SHALL support a setup section declaring the browser choice, the browser mode, the optional desktop-control switch, any debug port, and the most account sessions to run at the same time.
 
 #### Scenario: Defaults applied
 - **WHEN** the setup section omits the browser choice
 - **THEN** the agent uses the bundled Chromium with desktop control off
+
+#### Scenario: Default session limit
+- **WHEN** the setup section omits the session limit
+- **THEN** the agent runs at most 3 account sessions at the same time
+
+#### Scenario: Invalid session limit
+- **WHEN** the session limit is not a whole number from 1 to 16
+- **THEN** the agent reports the problem and does not start the run
 
 ### Requirement: Named targets
 The instructions file SHALL support a list of named targets, each with a base URL, so one project can cover a local server and several sites.
